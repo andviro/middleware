@@ -25,6 +25,10 @@ on contexts. The following primitives are provided:
 
 * Handler can be attached to the middleware with `On` method, it will be called when predicate return `true`.
 
+## Credits
+
+Inspired by [Telegraf](https://github.com/telegraf/telegraf) -- excellent Telegram bot framework for Node.js.
+
 ## License
 
 This code is released under
