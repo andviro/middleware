@@ -3,6 +3,7 @@ package middleware_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -10,15 +11,16 @@ import (
 )
 
 func handlerFactory(s string, dest *bytes.Buffer) mw.Handler {
-	return func(ctx context.Context) {
+	return func(ctx context.Context) error {
 		fmt.Fprintf(dest, "h(%s)\n", s)
+		return nil
 	}
 }
 
 func mwFactory(s string, dest *bytes.Buffer) mw.Middleware {
-	return func(ctx context.Context, next mw.Handler) {
+	return func(ctx context.Context, next mw.Handler) error {
 		fmt.Fprintf(dest, "mw(%s)\n", s)
-		next(ctx)
+		return next(ctx)
 	}
 }
 
@@ -36,6 +38,23 @@ func Test_Use_Then(t *testing.T) {
 	h3 := mw1.Then(h1)
 	h3(context.TODO())
 	if buf.String() != "mw(1)\nh(1)\n" {
+		t.Errorf("unexpected: %q", buf.String())
+	}
+}
+
+func Test_ErrorPasses(t *testing.T) {
+	buf := new(bytes.Buffer)
+	h := func(ctx context.Context) error {
+		fmt.Fprintln(buf, "h(1)")
+		return errors.New("test error")
+	}
+	mw1 := mwFactory("1", buf)
+	mw2 := mwFactory("2", buf)
+	err := mw.Compose(mw1, mw2).Then(h)(context.TODO())
+	if err == nil || err.Error() != "test error" {
+		t.Errorf("unexpected: %+v", err)
+	}
+	if buf.String() != "mw(1)\nmw(2)\nh(1)\n" {
 		t.Errorf("unexpected: %q", buf.String())
 	}
 }
