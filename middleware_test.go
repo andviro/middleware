@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	mw "bitbucket.org/andviro/pif/telegram/middleware"
+	mw "github.com/andviro/middleware"
 )
 
 func handlerFactory(s string, dest *bytes.Buffer) mw.Handler {
@@ -78,15 +78,15 @@ func Test_Use(t *testing.T) {
 	mw1 := mwFactory("1", buf)
 	mw2 := mwFactory("2", buf)
 	mw3 := mwFactory("3", buf)
-	m := mw.Safe.Use(mw1)
+	m := mw1.Use(mw.Safe)
 	m(ctx, nil)
 	if buf.String() != "mw(1)\n" {
 		t.Errorf("unexpected: %q", buf.String())
 	}
-	m = m.Use(mw2, mw3)
+	m = mw2.Use(mw3).Use(mw.Safe)
 	buf.Reset()
 	m(ctx, nil)
-	if buf.String() != "mw(2)\nmw(3)\nmw(1)\n" {
+	if buf.String() != "mw(2)\nmw(3)\n" {
 		t.Errorf("unexpected: %q", buf.String())
 	}
 }
@@ -97,7 +97,7 @@ func Test_Compose(t *testing.T) {
 	mw1 := mwFactory("1", buf)
 	mw2 := mwFactory("2", buf)
 	mw3 := mwFactory("3", buf)
-	m := mw.Compose(mw1, mw2, mw3, mw.Safe)
+	m := mw.Compose(mw1, mw2, mw3).Use(mw.Safe)
 	m(ctx, nil)
 	if buf.String() != "mw(1)\nmw(2)\nmw(3)\n" {
 		t.Errorf("unexpected: %q", buf.String())
@@ -113,7 +113,7 @@ func Test_Optional(t *testing.T) {
 	p1 := func(ctx context.Context) bool {
 		return ctx.Value("key").(int) == 1
 	}
-	m := mw.Optional(p1, m1)
+	m := mw.Optional(p1, m1).Use(mw.Safe)
 	m(ctx2, h1)
 	if buf.String() != "h(1)\n" {
 		t.Errorf("unexpected: %q", buf.String())
@@ -121,6 +121,29 @@ func Test_Optional(t *testing.T) {
 	buf.Reset()
 	m(ctx1, nil)
 	if buf.String() != "mw(1)\n" {
+		t.Errorf("unexpected: %q", buf.String())
+	}
+}
+
+func Test_Branch(t *testing.T) {
+	buf := new(bytes.Buffer)
+	ctx1 := context.WithValue(context.TODO(), "key", 1)
+	ctx2 := context.WithValue(context.TODO(), "key", 2)
+	h1 := handlerFactory("1", buf)
+	m1 := mwFactory("1", buf)
+	m2 := mwFactory("2", buf)
+	m3 := mwFactory("3", buf)
+	p1 := func(ctx context.Context) bool {
+		return ctx.Value("key").(int) == 1
+	}
+	m := m1.Branch(p1, m2).Use(m3)
+	m(ctx1, h1)
+	if buf.String() != "mw(1)\nmw(2)\nmw(3)\nh(1)\n" {
+		t.Errorf("unexpected: %q", buf.String())
+	}
+	buf.Reset()
+	m(ctx2, h1)
+	if buf.String() != "mw(1)\nmw(3)\nh(1)\n" {
 		t.Errorf("unexpected: %q", buf.String())
 	}
 }
