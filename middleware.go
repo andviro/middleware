@@ -38,12 +38,6 @@ var Passthrough Middleware = func(ctx context.Context, h Handler) error {
 
 // Compose middlewares into one
 func Compose(mws ...Middleware) Middleware {
-	if len(mws) == 0 {
-		return Safe
-	}
-	if len(mws) == 1 {
-		return mws[0]
-	}
 	return func(ctx context.Context, next Handler) error {
 		return next.Use(mws...)(ctx)
 	}
@@ -51,7 +45,7 @@ func Compose(mws ...Middleware) Middleware {
 
 // Optional returns new middleware chain that's applied only if predicate is true
 func Optional(p Predicate, mws ...Middleware) Middleware {
-	return Passthrough.Branch(p, Compose(mws...))
+	return Passthrough.Branch(p, mws...)
 }
 
 // Lazy produces middleware on demand using factory function and current
@@ -72,15 +66,15 @@ func (mw Middleware) Then(h Handler) Handler {
 // Use prepends provided middlewares to the current one
 func (m Middleware) Use(mws ...Middleware) Middleware {
 	return func(ctx context.Context, next Handler) error {
-		return m(ctx, next.Use(Compose(mws...)))
+		return m(ctx, next.Use(mws...))
 	}
 }
 
 // Branch constructs conditional middleware chain using predicate
-func (mw Middleware) Branch(p Predicate, next Middleware) Middleware {
+func (mw Middleware) Branch(p Predicate, mws ...Middleware) Middleware {
 	return Lazy(func(ctx context.Context) Middleware {
 		if p(ctx) {
-			return mw.Use(next)
+			return mw.Use(mws...)
 		}
 		return mw
 	})
