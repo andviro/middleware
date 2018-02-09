@@ -11,6 +11,17 @@ type Factory func(context.Context) Middleware
 // Handler is applied to context
 type Handler func(context.Context) error
 
+// Default is just an empty pass-through middleware
+var Default Middleware
+
+// Apply calls handler on the context. It's safe to use with nil handler.
+func (h Handler) Apply(ctx context.Context) error {
+	if h == nil {
+		return nil
+	}
+	return h(ctx)
+}
+
 // Use applies middlewares to the handler
 func (h Handler) Use(mws ...Middleware) Handler {
 	for i := len(mws) - 1; i >= 0; i-- {
@@ -23,41 +34,32 @@ func (h Handler) Use(mws ...Middleware) Handler {
 // next handler
 type Middleware func(context.Context, Handler) error
 
-// Safe to apply on nil handler
-var Safe Middleware = func(ctx context.Context, h Handler) error {
-	if h != nil {
-		return h(ctx)
-	}
-	return nil
-}
-
-// Passthrough simple calls the next handler
-var Passthrough Middleware = func(ctx context.Context, h Handler) error {
-	return h(ctx)
-}
-
 // Compose middlewares into one
 func Compose(mws ...Middleware) Middleware {
 	return func(ctx context.Context, next Handler) error {
-		return next.Use(mws...)(ctx)
+		return next.Use(mws...).Apply(ctx)
 	}
 }
 
 // Optional returns new middleware chain that's applied only if predicate is true
 func Optional(p Predicate, mws ...Middleware) Middleware {
-	return Passthrough.Branch(p, mws...)
+	return Middleware(nil).Branch(p, mws...)
 }
 
 // Lazy produces middleware on demand using factory function and current
 // context
 func Lazy(f Factory) Middleware {
 	return func(ctx context.Context, next Handler) error {
-		return f(ctx)(ctx, next)
+		return f(ctx).Then(next).Apply(ctx)
 	}
 }
 
-// Then applies middleware to the handler
+// Then applies middleware to the handler. If called on nil middleware, returns
+// the handler itself.
 func (mw Middleware) Then(h Handler) Handler {
+	if mw == nil {
+		return h
+	}
 	return func(ctx context.Context) error {
 		return mw(ctx, h)
 	}
@@ -66,15 +68,16 @@ func (mw Middleware) Then(h Handler) Handler {
 // Use prepends provided middlewares to the current one
 func (m Middleware) Use(mws ...Middleware) Middleware {
 	return func(ctx context.Context, next Handler) error {
-		return m(ctx, next.Use(mws...))
+		return m.Then(next.Use(mws...)).Apply(ctx)
 	}
 }
 
 // Branch constructs conditional middleware chain using predicate
 func (mw Middleware) Branch(p Predicate, mws ...Middleware) Middleware {
+	trueMw := mw.Use(mws...)
 	return Lazy(func(ctx context.Context) Middleware {
 		if p(ctx) {
-			return mw.Use(mws...)
+			return trueMw
 		}
 		return mw
 	})
@@ -84,8 +87,8 @@ func (mw Middleware) Branch(p Predicate, mws ...Middleware) Middleware {
 func (mw Middleware) On(p Predicate, h Handler) Middleware {
 	return func(ctx context.Context, next Handler) error {
 		if p(ctx) {
-			return mw(ctx, h)
+			return mw.Then(h).Apply(ctx)
 		}
-		return mw(ctx, next)
+		return mw.Then(next).Apply(ctx)
 	}
 }

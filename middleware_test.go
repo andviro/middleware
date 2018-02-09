@@ -20,7 +20,7 @@ func handlerFactory(s string, dest *bytes.Buffer) mw.Handler {
 func mwFactory(s string, dest *bytes.Buffer) mw.Middleware {
 	return func(ctx context.Context, next mw.Handler) error {
 		fmt.Fprintf(dest, "mw(%s)\n", s)
-		return next(ctx)
+		return next.Apply(ctx)
 	}
 }
 
@@ -72,7 +72,7 @@ func Test_On(t *testing.T) {
 	p2 := func(ctx context.Context) bool {
 		return ctx.Value("key").(int) == 2
 	}
-	m := mw.Safe.
+	m := mw.Default.
 		On(p1, h1).
 		On(p2, h2)
 	m(ctx1, nil)
@@ -97,12 +97,12 @@ func Test_Use(t *testing.T) {
 	mw1 := mwFactory("1", buf)
 	mw2 := mwFactory("2", buf)
 	mw3 := mwFactory("3", buf)
-	m := mw1.Use(mw.Safe)
+	m := mw1
 	m(ctx, nil)
 	if buf.String() != "mw(1)\n" {
 		t.Errorf("unexpected: %q", buf.String())
 	}
-	m = mw2.Use(mw3).Use(mw.Safe)
+	m = mw2.Use(mw3)
 	buf.Reset()
 	m(ctx, nil)
 	if buf.String() != "mw(2)\nmw(3)\n" {
@@ -116,7 +116,7 @@ func Test_Compose(t *testing.T) {
 	mw1 := mwFactory("1", buf)
 	mw2 := mwFactory("2", buf)
 	mw3 := mwFactory("3", buf)
-	m := mw.Compose(mw1, mw2, mw3).Use(mw.Safe)
+	m := mw.Compose(mw1, mw2, mw3)
 	m(ctx, nil)
 	if buf.String() != "mw(1)\nmw(2)\nmw(3)\n" {
 		t.Errorf("unexpected: %q", buf.String())
@@ -132,7 +132,7 @@ func Test_Optional(t *testing.T) {
 	p1 := func(ctx context.Context) bool {
 		return ctx.Value("key").(int) == 1
 	}
-	m := mw.Optional(p1, m1).Use(mw.Safe)
+	m := mw.Optional(p1, m1)
 	m(ctx2, h1)
 	if buf.String() != "h(1)\n" {
 		t.Errorf("unexpected: %q", buf.String())
