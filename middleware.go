@@ -66,9 +66,9 @@ func (mw Middleware) Then(h Handler) Handler {
 }
 
 // Use prepends provided middlewares to the current one
-func (m Middleware) Use(mws ...Middleware) Middleware {
+func (mw Middleware) Use(mws ...Middleware) Middleware {
 	return func(ctx context.Context, next Handler) error {
-		return m.Then(next.Use(mws...)).Apply(ctx)
+		return mw.Then(next.Use(mws...)).Apply(ctx)
 	}
 }
 
