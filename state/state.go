@@ -36,12 +36,23 @@ func Current(ctx context.Context) (res State) {
 	return
 }
 
-// Next returns next state or provided error
-func Next(err error, next State) error {
-	if err != nil {
-		return err
+// Next returns next state or error from handler
+func Next(val interface{}) middleware.Middleware {
+	var f func(context.Context) State
+	switch t := val.(type) {
+	case string:
+		f = func(context.Context) State { return State{Key: t} }
+	case func(context.Context) State:
+		f = t
+	case State:
+		f = func(context.Context) State { return t }
 	}
-	return next
+	return func(ctx context.Context, next middleware.Handler) (err error) {
+		if err = next.Apply(ctx); err != nil {
+			return
+		}
+		return f(ctx)
+	}
 }
 
 // Machine bulds middleware using provided store factory. Constructed
@@ -55,8 +66,8 @@ func Machine(factory func(context.Context) Store) middleware.Middleware {
 			return
 		}
 		err = next(context.WithValue(ctx, stateKey, st))
-		if next, ok := err.(State); ok {
-			return store.Set(next)
+		if nextState, ok := err.(State); ok {
+			return store.Set(nextState)
 		}
 		return
 	}
