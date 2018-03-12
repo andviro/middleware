@@ -55,6 +55,13 @@ func Next(val interface{}) middleware.Middleware {
 	}
 }
 
+// With injects state into context
+func With(state State) middleware.Middleware {
+	return func(ctx context.Context, next middleware.Handler) error {
+		return next.Apply(context.WithValue(ctx, stateKey, state))
+	}
+}
+
 // Machine bulds middleware using provided store factory. Constructed
 // middleware injects state taken from store into context and saves next state
 // obtained from handler error value.
