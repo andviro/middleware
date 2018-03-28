@@ -4,6 +4,7 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"regexp"
 
@@ -16,13 +17,24 @@ const stateKey stateKeyType = iota
 
 // State is represented by Key and passes optional Value
 type State struct {
-	Key   string
-	Value interface{}
-	Prev  *State
+	Key     string
+	Payload json.RawMessage
+	Prev    *State
 }
 
 func (s *State) Error() string {
 	return s.Key
+}
+
+// GetValue unmarshals state payload into Go value dest
+func (s *State) GetValue(dest interface{}) error {
+	return json.Unmarshal(s.Payload, dest)
+}
+
+// SetValue sets state payload to Go value
+func (s *State) SetValue(src interface{}) (err error) {
+	s.Payload, err = json.Marshal(src)
+	return
 }
 
 // Store saves and loads state
