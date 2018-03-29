@@ -92,3 +92,34 @@ func (mw Middleware) On(p Predicate, h Handler) Middleware {
 		return mw.Then(next).Apply(ctx)
 	}
 }
+
+// And constructs predicate as logical AND of its arguments
+func And(ps ...Predicate) Predicate {
+	return func(ctx context.Context) bool {
+		for _, p := range ps {
+			if !p(ctx) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+// Or constructs predicate as logical OR of its arguments
+func Or(ps ...Predicate) Predicate {
+	return func(ctx context.Context) bool {
+		for _, p := range ps {
+			if p(ctx) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// Not negates predicate
+func Not(p Predicate) Predicate {
+	return func(ctx context.Context) bool {
+		return !p(ctx)
+	}
+}
